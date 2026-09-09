@@ -1,0 +1,9 @@
+[package]
+name = "rustject"
+description = "x64 manual-map DLL injector for CS2"
+license = "MIT"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading", "Win32_System_Memory", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_Debug", "Win32_System_LibraryLoader"] }
