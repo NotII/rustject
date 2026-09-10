@@ -149,3 +149,29 @@ pub fn exception_dir(img: &Image) -> (u32, u32) {
     let sz = r32(&img.data, img.opt + 112 + 28).unwrap_or(0);
     (rva, sz / 12)
 }
+
+pub fn import_dlls(img: &Image) -> Vec<String> {
+    let mut out = Vec::new();
+    let (Some(rva), Some(sz)) = (r32(&img.data, img.opt + 112 + 8), r32(&img.data, img.opt + 112 + 12)) else {
+        return out;
+    };
+    if rva == 0 {
+        return out;
+    }
+    let mut pos = rva as usize;
+    let end = (rva + if sz == 0 { 20 * 64 } else { sz }) as usize;
+    while pos + 20 <= end.min(img.data.len()) {
+        let Some(name_rva) = r32(&img.data, pos + 12) else {
+            break;
+        };
+        if name_rva == 0 {
+            break;
+        }
+        let dll = cstr(&img.data, name_rva as usize).to_lowercase();
+        if !dll.starts_with("api-ms-") {
+            out.push(dll);
+        }
+        pos += 20;
+    }
+    out
+}

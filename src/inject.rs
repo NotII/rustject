@@ -43,6 +43,20 @@ fn wstr(w: &[u16]) -> String {
     String::from_utf16_lossy(&w[..end])
 }
 
+// toolhelp lists zombie processes too; skip any that already exited
+fn alive(pid: u32) -> bool {
+    unsafe {
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if h.is_null() {
+            return false;
+        }
+        let mut code = 0u32;
+        let ok = GetExitCodeProcess(h, &mut code);
+        CloseHandle(h);
+        ok != 0 && code == 259 // STILL_ACTIVE
+    }
+}
+
 pub fn pid_named(exe: &str) -> Option<u32> {
     unsafe {
         let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -54,7 +68,7 @@ pub fn pid_named(exe: &str) -> Option<u32> {
         let mut found = None;
         if Process32FirstW(snap, &mut e) != 0 {
             loop {
-                if wstr(&e.szExeFile).eq_ignore_ascii_case(exe) {
+                if wstr(&e.szExeFile).eq_ignore_ascii_case(exe) && alive(e.th32ProcessID) {
                     found = Some(e.th32ProcessID);
                     break;
                 }

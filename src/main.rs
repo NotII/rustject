@@ -50,6 +50,28 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    // a freshly spawned target hasn't loaded every dll yet; wait until all
+    // imports are resolvable remotely or manual mapping fails on missing ones
+    let needed: Vec<String> = std::fs::read(&dll)
+        .ok()
+        .and_then(|raw| pe::map(&raw).ok())
+        .map(|img| pe::import_dlls(&img))
+        .unwrap_or_default();
+    if !needed.is_empty() {
+        let start = std::time::Instant::now();
+        loop {
+            let mods = inject::modules(pid);
+            if needed.iter().all(|d| mods.contains_key(d)) {
+                break;
+            }
+            if start.elapsed() > Duration::from_secs(60) {
+                eprintln!("[!] timed out waiting for target modules, trying anyway");
+                break;
+            }
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    }
+
     let Some(handle) = inject::open(pid) else {
         eprintln!("[-] OpenProcess failed (try running as admin)");
         return ExitCode::FAILURE;
